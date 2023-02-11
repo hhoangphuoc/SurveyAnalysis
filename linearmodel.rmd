@@ -1,0 +1,207 @@
+---
+title: 'Project Linear Model'
+output:
+  html_document: default
+  word_document: default
+date: "10/1/2023"
+---
+
+# Study 2: Communication Science Students
+
+You can continue with the data file we created at the end of the first three steps. Please note that there are not that many units (respondents/ students) in this data set. Ideally, we would like to have more data before we attempt to analyze multivariate models. You can choose to formulate your own research question and analyze that, or you can continue with the research question formulated here.
+
+Research question: We want to explain why some students are more satisfied with the Communication Science program than others. We expect that students who experience a high amount of study related stress will be less satisfied. We also think that involvement in the Communication Science community, in the form of participation in Communiqué events, will increase satisfaction with the program.
+
+Note: The variable 'participation in Communiqué events' is measured on an ordinal scale and therefore not ideal. I especially recommend being careful when using this type of variables (ordinal, 5 or less points on the scale, measured with 1 item only) as a dependent variable as the variability might be low.
+
+------------------------------------------------------------------------
+
+```{r include = TRUE, echo = TRUE, warning = FALSE, message = FALSE}
+# import require library
+library(tidyverse)
+library(psych)
+library(broom)
+library(modelr)
+library(janitor)
+library(CTT)
+
+# load the clean dataset
+dat <- read.csv("clean_data.csv")
+
+# check the summary of the data
+dat %>%
+    glimpse()
+
+#omit the data which still contain NA
+dat <- dat %>% na.omit()
+
+```
+
+We then create new columns for different
+
+-   SMUsage scale - remove item 1,5
+
+-   Cyberbullying experience - not remove any item
+
+-   Social Isolation scale - not removing any item
+
+```{r include = TRUE, echo = TRUE, warning = FALSE, message = FALSE}
+dat <- dat %>%
+    mutate(
+        SMUsage = (SM.usage_2 + SM.usage_3 + SM.usage_4 + SM.usage_6) / 4,
+        SocialIsolation = (COVID.19.Scale_1 + COVID.19.Scale_2
+            + COVID.19.Scale_3 + COVID.19.Scale_4 + COVID.19.Scale_5
+            + COVID.19.Scale_6 + COVID.19.Scale_7) / 7,
+        CyberbullyingExp = (Cyberbyllying.exp_1 + Cyberbyllying.exp_2
+            + Cyberbyllying.exp_3 + Cyberbyllying.exp_4 + Cyberbyllying.exp_5
+            + Cyberbyllying.exp_6) / 6,
+        MentalHealth = (Cyberbullying.health_1 + Cyberbullying.health_2
+            + Cyberbullying.health_3 + Cyberbullying.health_4
+            + Cyberbullying.health_5 + Cyberbullying.health_6
+            + Cyberbullying.health_7) / 7
+    )
+```
+
+5.  Describe your variables using relevant measures of center, spread, and range. Describe relations between variables. Include graphical representations of your data.
+
+*We start with descriptive analyses using numbers.*
+
+```{r include = TRUE, echo = TRUE, warning = FALSE, message = FALSE}
+
+dat %>%
+    select(SMUsage, SocialIsolation, CyberbullyingExp, MentalHealth) %>%
+    map(~ c(Mean = mean(.), Sd = sd(.), Range = range(.)))
+
+dat %>%
+    select(SMUsage, SocialIsolation, CyberbullyingExp, MentalHealth) %>%
+    cor()
+```
+
+*The average on SMUsage scale of 1 (Completely Disagree) to 5 (Completely Agree) in this sample was 2.73 (SD = 0.86). The average Social Isolation on a scale of 1 (Completely Disagree) to 5 (completely agree) was 3.16 (SD = 0.75). Average Cyberbullying experience in this sample was 2.76 (SD = 1.35) on a scale of 1 (Completely Disagree) to 5 (Complete Agree). When we look at the ranges of social media usage, there is no extreme value, and the experience on cyberbullying as well as social isolation are varied as well.*
+
+*When observing the correlation. We see there are strong correlations betweens some of these variables. The correlation between the two variables (Social Isolation and SMUsage) and between (Mental Health and SMUsage) is high. Based on these correlations, we can expect a high explanatory value for our linear model. Besides, there is a low correlation between SMUsage and Cyberbullying Experience (CyberbullyingExp), which form another linear model, but since it is low correlation, we are not expect a high explanatory value for the second model.*
+
+*So we can seperate these variables into 2 models as followed:*
+
+-   The effect of Social Isolation and the effect of cyberbullying mental health on Social Media usage
+
+-   The effect of Social Media usage on Cyberbullying Experience
+
+**Model 1: The effect of Social Isolation and the effect of cyberbullying mental health on Social Media usage**
+
+*We first do descriptive analyses using graphs. We can look at the relation between independent variables and the dependent variable in a scatter plot to see if the relationships are indeed linear and we can use a linear model to describe them.*
+
+```{r include = TRUE, echo = TRUE, warning = FALSE, message = FALSE}
+dat %>%
+  ggplot(aes(x = SocialIsolation, y = SMUsage)) +
+  geom_point() + geom_smooth(method = "lm")
+
+dat %>%
+  ggplot(aes(x = MentalHealth, y = SMUsage)) +
+  geom_point() + geom_smooth(method = "lm")
+```
+
+*As we can see, there is a linear pattern in the scatter plot between SocialIsolation and SMUsage, however, there is no clear pattern (linear or curvilinear) in the second scatter plot. So we can expect that the first independent variables (Social Isolation) affected linearly to the dependent variables, and the second independent variables (MentalHealth) may not affect much to SMUsage, the relation could not fit.*
+
+However, if we check for the relation between 2 independent variable
+
+**Linear Equation and Null hypotheses**
+
+$SocialMediaUsage_{i} = \beta_{0} + \beta_{1} \times SocialIsolation_{i} + \beta_{2} \times CyberbullyingMentalHealth_{i} + e_{i}$
+
+$H_{01}:$ There is no effect of Social Isolation in COVID19 on Social Media Usage when we control for Cyberbullying Mental Health.
+
+$H_{01}: \beta_{1} = 0$
+
+$H_{02}:$ There is no effect of Cyberbullying Mental Health on Social Media Usage when we control for Social Isolation in COVID19
+
+$H_{02}: \beta_{2} = 0$
+
+***Give the estimated linear equation and test the hypotheses.***
+
+```{r include = TRUE, echo = TRUE, warning = FALSE, message = FALSE}
+#We first run the regression analysis
+
+model_1 <- dat %>%
+  lm(SMUsage ~ SocialIsolation + MentalHealth, data=.)
+
+#We then ask to see the results 
+model_1 %>% summary()
+model_1 %>% confint()
+
+```
+
+```{r include = TRUE, echo = TRUE, warning = FALSE, message = FALSE}
+# a tidy table is sometimes easier to read than the summary
+model_1 %>% tidy()
+```
+
+We have the final model:
+
+$SMUsage_{i} = 0.788 + 0.463 \times SocialISolation_{i} + 0.165 \times MentalHealth_{i}+ e_{i}$
+
+*The effects of SocialIsolation and MentalHealth on Social Media Usage are in the expected directions (more social isolation during COVID19 leads to more usage of social media, and more mental health vulnerability caused by cyberbullying also leads to more usage of social media) but the effects in the latter are quite small. We have to ask ourselves first if these effects are substantially meaningful or significant. A 1 point increase in social isolation would lead to a 0.463 increase in usage of social media, which is quite significant, while the increase of mental health is on the other hands, non significant.*
+
+*Next we test the hypotheses to see if these effect is actually impactful.* *The t-value for the effect of social isolation on SMUsage is 5.035 and the p-value is 1.513e-06 \<\< 0.001. This is too small value and it close to zero, so we reject the null hypothesis that there is no effect of Social Isolation on Social Media usage.* T*he t-value for the effect of MentalHealth on Social Media usage is 1.899 and the p-value is 0.597. This is higher than the alpha of .05. We do not reject the null hypothesis that there is no effect of MentalHealth on usage of social media.*
+
+*The researcher was also interested in the explanatory power of the model. R-squared for this model is 23%. which means this model explains some differences in social media usage between people in this sample, due to the effect of Social Isolation and Mental health When we adjust for possible overfitting, we arrive at an adjusted R-squared around 22%.*
+
+***Results in an APA format, include confidence intervals.***
+
+We ran a multiple linear regression with Social Media usage as dependent variable and Social Isolation and Cyberbullying mental health as independent variables. The model explained 23% of variance on the social media usage in the sample. We reject the null hypothesis that social isolation had no effect on social media usage over and above the effect of mental health, *b* = 0.463, *SE* = 0.092, *t*(134) = 5.035, *p* \<\< .001, *95% CI* [0.281, 0.645]. We also did not reject the null hypothesis that mental health of cyberbullying had no effect on social media usage over and above the effect of social isolation, *b* = 0.165, *SE* = 0.087, *t*(134) = 1.899, *p* = .597, *95% CI* [-0.007, 0.337].
+
+------------------------------------------------------------------------
+
+**Model 2: The effect of Social Media usage on Cyberbullying Experience**
+
+*We first do descriptive analyses using graphs. We can look at the relation between independent variables and the dependent variable in a scatter plot to see if the relationships are indeed linear and we can use a linear model to describe them.*
+
+```{r include = TRUE, echo = TRUE, warning = FALSE, message = FALSE}
+dat %>%
+  ggplot(aes(x = SMUsage, y = CyberbullyingExp)) +
+  geom_point() + geom_smooth(method = "lm")
+
+```
+
+*There is no clear pattern (linear or curvilinear) in this scatter plot. So we can expect that the independent variables not affect linearly to the dependent variables, and the relation could not fit.*
+
+**Linear Equation and Null hypotheses**
+
+$CyberbullyingExperience_{i} = \beta_{0} + \beta_{1} \times SocialMediaUsage_{i} + e_{i}$
+
+$H_{0}:$ There is no effect of Social Media usage on the Cyberbullying experience
+
+$H_{0}: \beta_{1} = 0$
+
+***Give the estimated linear equation and test the hypotheses.***
+
+```{r include = TRUE, echo = TRUE, warning = FALSE, message = FALSE}
+#We first run the regression analysis
+
+model_2 <- dat %>%
+  lm(CyberbullyingExp ~ SMUsage, data=.)
+
+#We then ask to see the results 
+model_2 %>% summary()
+model_2 %>% confint()
+
+```
+
+$CyberbullyingExp_{i} = 2.159 + 0.221 \times SMUsage_{i} + e_{i}$
+
+```{r include = TRUE, echo = TRUE, warning = FALSE, message = FALSE}
+# a tidy table is sometimes easier to read than the summary
+model_2 %>% tidy()
+```
+
+*The effects of social media usage is in the expected directions (more usage of social media leads to more experience of cyberbullying) but the effects is very small. We have to ask ourselves first if these small effects are substantially meaningful or significant. A 1 point increase in social media usage would lead to a 0.221 increase in cyberbullying experience. That is not so small but not a lot on the 5 point scale of cyberbullying experience.*
+
+*Then we test the hypothesis.* *The t-value for the effect of social media usage on cyberbullying experience is 1.643 and the p-value is .103. This is higher than the alpha of .05, so we do not reject the null hypothesis that there is no effect of social media usage on the cyberbullying experience.*
+
+*The researcher was also interested in the explanatory power of the model and R-squared for this model is 1.961%. This means that this model explains almost none of the difference in experience of cyberbullying between people in this sample. When we adjust for possible overfitting, we arrive at an adjusted R-squared is 1.235%*
+
+***Present your results in an APA format, in both text and tables. Include confidence intervals.***
+
+We ran a linear regression with experience of cyberbullying as dependent variable and social media usage as independent variables. The model explained 1.96% of variance on cyberbullying experience in the sample. We did not reject the null hypothesis that usage of social media had no effect on cyberbullying experience over and above the effect of participation, *b* = 0.221, *SE* = 0.134, *t*(134) = 1.643, *p* = .103, *95% CI* [-0.044, 0.486].
+
+------------------------------------------------------------------------
